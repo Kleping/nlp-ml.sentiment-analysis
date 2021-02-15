@@ -70,13 +70,22 @@ def encode(_sentence, _voc, _max_input_len):
 with open('data/input.txt', 'r', encoding='utf-8') as f:
     x = list(filter(None, f.read().split('\n')[1000:1200]))
 
+with open('data/output.txt', 'r', encoding='utf-8') as f:
+    y = list(filter(None, f.read().split('\n')[1000:1200]))
+
 voc, max_input_len = deserialize_and_read_config()
 
 model = tf.keras.models.load_model('models/model.h5')
 print(model.summary())
 
+counter = 0
 
 for i in range(len(x)):
     sentence = x[i]
+    correct_label = int(y[i])
     result = model.predict(encode(sentence, voc, max_input_len))[0]
-    print('\nsentence: {}\ntonality: {}'.format(sentence, np.argmax(result)+1))
+    predicted_tonality = np.argmax(result) + 1
+    if correct_label == predicted_tonality:
+        counter += 1
+
+print('{} out of {}'.format(counter, len(x)))

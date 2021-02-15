@@ -8,10 +8,9 @@ import json
 validation_split = .2
 
 epochs = 100
-batch_size = 128
-LATENT_DIM = 32
-
-model_name = 'model.h5'
+DATA_COUNT = 1500
+batch_size = 64
+LATENT_DIM = 64
 
 data_path = 'data/input.txt'
 model_path = 'models/model.h5'
@@ -94,10 +93,10 @@ def serialize_and_write_config(_voc, _max_input_len, _history):
 
 # read all the data
 with open('data/input.txt', 'r', encoding='utf-8') as f:
-    x = list(filter(None, f.read().split('\n')))
+    x = list(filter(None, f.read().split('\n')[:DATA_COUNT]))
 
 with open('data/output.txt', 'r', encoding='utf-8') as f:
-    y = list(filter(None, f.read().split('\n')))
+    y = list(filter(None, f.read().split('\n')[:DATA_COUNT]))
 
 
 # shuffle lists
@@ -171,6 +170,28 @@ class DataSupplier(tf.keras.utils.Sequence):
         return _x, _y
 
 
+class Attention(tf.keras.layers.Layer):
+
+    def __init__(self, return_sequences=False):
+        self.return_sequences = return_sequences
+        super(Attention, self).__init__()
+
+    def build(self, input_shape):
+        self.W = self.add_weight(name="att_weight", shape=(input_shape[-1], 1), initializer="normal")
+        self.b = self.add_weight(name="att_bias", shape=(max_input_len, 1), initializer="zeros")
+        super(Attention, self).build(input_shape)
+
+    def call(self, x, **kwargs):
+        e = tf.keras.backend.tanh(tf.keras.backend.dot(x, self.W) + self.b)
+        a = tf.keras.backend.softmax(e, axis=1)
+        output = x * a
+
+        if self.return_sequences:
+            return output
+
+        return tf.keras.backend.sum(output, axis=1)
+
+
 # architecture model creation
 lstm_cell = tf.keras.layers.LSTM(LATENT_DIM, return_sequences=True, recurrent_dropout=.1)
 lstm_cell_secondary = tf.keras.layers.LSTM(LATENT_DIM*2, return_sequences=True, recurrent_dropout=.1)
@@ -179,10 +200,12 @@ model = tf.keras.Sequential()
 model . add(tf.keras.Input(shape=(None,)))
 model . add(tf.keras.layers.Embedding(len(voc), LATENT_DIM))
 model . add(tf.keras.layers.Bidirectional(lstm_cell))
-model . add(tf.keras.layers.Bidirectional(lstm_cell_secondary))
-model . add(tf.keras.layers.GlobalMaxPooling1D())
-model . add(tf.keras.layers.Dense(10))
-model . add(tf.keras.layers.Activation("softmax"))
+# model . add(tf.keras.layers.Bidirectional(lstm_cell_secondary))
+model . add(Attention(return_sequences=False))
+model . add(tf.keras.layers.Dropout(.15))
+# model . add(tf.keras.layers.GlobalMaxPooling1D())
+model . add(tf.keras.layers.Flatten())
+model . add(tf.keras.layers.Dense(10, activation="softmax"))
 
 model . summary()
 

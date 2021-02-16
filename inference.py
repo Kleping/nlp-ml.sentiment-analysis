@@ -68,10 +68,10 @@ def encode(_sentence, _voc, _max_input_len):
 
 
 with open('data/input.txt', 'r', encoding='utf-8') as f:
-    x = list(filter(None, f.read().split('\n')[1000:1200]))
+    x = list(filter(None, f.read().split('\n')[1500:1600]))
 
 with open('data/output.txt', 'r', encoding='utf-8') as f:
-    y = list(filter(None, f.read().split('\n')[1000:1200]))
+    y = list(filter(None, f.read().split('\n')[1500:1600]))
 
 voc, max_input_len = deserialize_and_read_config()
 

@@ -7,7 +7,7 @@ import json
 
 validation_split = .2
 
-epochs = 100
+epochs = 1
 DATA_COUNT = 1500
 batch_size = 64
 LATENT_DIM = 64
@@ -80,11 +80,11 @@ def create_vocabulary(_x):
     return [PAD_TOKEN] + _voc
 
 
-def serialize_and_write_config(_voc, _max_input_len, _history):
+def serialize_and_write_config(_voc, _max_input_len):
     config = {
         'voc': _voc,
-        'max_input_len': _max_input_len,
-        'history': _history
+        'max_input_len': _max_input_len
+        # 'history': _history
     }
 
     with open('models/model.config', 'w') as config_file:
@@ -170,28 +170,6 @@ class DataSupplier(tf.keras.utils.Sequence):
         return _x, _y
 
 
-class Attention(tf.keras.layers.Layer):
-
-    def __init__(self, return_sequences=False):
-        self.return_sequences = return_sequences
-        super(Attention, self).__init__()
-
-    def build(self, input_shape):
-        self.W = self.add_weight(name="att_weight", shape=(input_shape[-1], 1), initializer="normal")
-        self.b = self.add_weight(name="att_bias", shape=(max_input_len, 1), initializer="zeros")
-        super(Attention, self).build(input_shape)
-
-    def call(self, x, **kwargs):
-        e = tf.keras.backend.tanh(tf.keras.backend.dot(x, self.W) + self.b)
-        a = tf.keras.backend.softmax(e, axis=1)
-        output = x * a
-
-        if self.return_sequences:
-            return output
-
-        return tf.keras.backend.sum(output, axis=1)
-
-
 # architecture model creation
 lstm_cell = tf.keras.layers.LSTM(LATENT_DIM, return_sequences=True, recurrent_dropout=.1)
 lstm_cell_secondary = tf.keras.layers.LSTM(LATENT_DIM*2, return_sequences=True, recurrent_dropout=.1)
@@ -200,11 +178,9 @@ model = tf.keras.Sequential()
 model . add(tf.keras.Input(shape=(None,)))
 model . add(tf.keras.layers.Embedding(len(voc), LATENT_DIM))
 model . add(tf.keras.layers.Bidirectional(lstm_cell))
-# model . add(tf.keras.layers.Bidirectional(lstm_cell_secondary))
-model . add(Attention(return_sequences=False))
+model . add(tf.keras.layers.Bidirectional(lstm_cell_secondary))
 model . add(tf.keras.layers.Dropout(.15))
-# model . add(tf.keras.layers.GlobalMaxPooling1D())
-model . add(tf.keras.layers.Flatten())
+model . add(tf.keras.layers.GlobalMaxPooling1D())
 model . add(tf.keras.layers.Dense(10, activation="softmax"))
 
 model . summary()
@@ -236,4 +212,4 @@ history = model.fit(
 ).history
 
 model.save(model_path)
-serialize_and_write_config(voc, max_input_len, history)
+serialize_and_write_config(voc, max_input_len)

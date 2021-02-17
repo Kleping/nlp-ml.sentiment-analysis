@@ -7,10 +7,9 @@ import json
 
 validation_split = .2
 
-epochs = 1
-DATA_COUNT = 1500
-batch_size = 64
-LATENT_DIM = 64
+epochs = 50
+DATA_COUNT = 10000
+batch_size = 128
 
 data_path = 'data/input.txt'
 model_path = 'models/model.h5'
@@ -60,11 +59,8 @@ def split_data(_x, _y):
     _y_valid = _y[-int(validation_split * len(_y)):]
     _y_train = _y[:int(len(_y) - len(_y_valid))]
 
-    _x_residual = len(_x_valid) // 2
-    _x = (_x_train, _x_valid[-_x_residual:], _x_valid[:_x_residual])
-
-    _y_residual = len(_y_valid) // 2
-    _y = (_y_train, _y_valid[-_y_residual:], _y_valid[:_y_residual])
+    _x = (_x_train, _x_valid)
+    _y = (_y_train, _y_valid)
 
     return _x, _y
 
@@ -80,11 +76,11 @@ def create_vocabulary(_x):
     return [PAD_TOKEN] + _voc
 
 
-def serialize_and_write_config(_voc, _max_input_len):
+def serialize_and_write_config(_voc, _max_input_len, _history):
     config = {
         'voc': _voc,
-        'max_input_len': _max_input_len
-        # 'history': _history
+        'max_input_len': _max_input_len,
+        'history': _history
     }
 
     with open('models/model.config', 'w') as config_file:
@@ -105,10 +101,7 @@ rn.shuffle(c)
 x, y = zip(*c)
 
 
-(x_train, x_valid, x_test), (y_train, y_valid, y_test) = split_data(x, y)
-
-print("amount of training data: " + str(len(x_train) + len(x_valid)))
-print("amount of test data: " + str(len(x_test)))
+(x_train, x_valid), (y_train, y_valid) = split_data(x, y)
 
 max_input_len = max(find_max_input_len(x_train), find_max_input_len(x_valid))
 voc = create_vocabulary(x_train)
@@ -171,22 +164,20 @@ class DataSupplier(tf.keras.utils.Sequence):
 
 
 # architecture model creation
-lstm_cell = tf.keras.layers.LSTM(LATENT_DIM, return_sequences=True, recurrent_dropout=.1)
-lstm_cell_secondary = tf.keras.layers.LSTM(LATENT_DIM*2, return_sequences=True, recurrent_dropout=.1)
-
 model = tf.keras.Sequential()
 model . add(tf.keras.Input(shape=(None,)))
-model . add(tf.keras.layers.Embedding(len(voc), LATENT_DIM))
-model . add(tf.keras.layers.Bidirectional(lstm_cell))
-model . add(tf.keras.layers.Bidirectional(lstm_cell_secondary))
+model . add(tf.keras.layers.Embedding(len(voc), 8))
+model . add(tf.keras.layers.LSTM(16, return_sequences=True, recurrent_dropout=.1))
 model . add(tf.keras.layers.Dropout(.15))
 model . add(tf.keras.layers.GlobalMaxPooling1D())
 model . add(tf.keras.layers.Dense(10, activation="softmax"))
 
 model . summary()
+print("Amount of data: " + str(len(x_train)) + "/" + str(len(x_valid)))
+
 
 optimizer = tf.keras.optimizers.Adam()
-model.compile(optimizer=optimizer, loss='categorical_crossentropy', metrics=['accuracy'])
+model.compile(optimizer=optimizer, loss=tf.keras.losses.categorical_crossentropy, metrics=['accuracy'])
 
 train_supplier = DataSupplier(
     batch_size,
@@ -212,4 +203,4 @@ history = model.fit(
 ).history
 
 model.save(model_path)
-serialize_and_write_config(voc, max_input_len)
+serialize_and_write_config(voc, max_input_len, history)
